@@ -1,0 +1,62 @@
+---
+title: "Impact of Storms and Other Severe Weather Events On Both Public Health and Economic Problems"  
+output: html_document
+---
+
+The basic goal of this report is to explore the NOAA Storm Database and answer the following questions  
+
+1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
+2. Across the United States, which types of events have the greatest economic consequences?  
+
+A copy of the data file can be found at https://github.com/fissio/RepData_PeerAssessment2/blob/master/repdata-data-StormData.csv.bz2  
+
+## Data Processing
+### Read the storm data
+```{r}
+library(ggplot2)
+library(grid)
+library(gridExtra)
+stormdata <- read.csv("repdata-data-StormData.csv")
+```
+
+### Analyse the data distribution over the years
+```{r}
+year <- as.numeric(format(as.Date(stormdata$BGN_DATE, format = "%m/%d/%Y %H:%M:%S"), "%Y"))
+stormdata <- cbind(stormdata, year)
+hist(stormdata$year, breaks = 60, xlab = "Year", main = "Distribution of Storm Data Over 1950 - 2010", col = "antiquewhite3")
+```
+### In the earlier years of the database there are generally fewer events recorded,therefore we will only consider data collected from 1990 onwards. We will also reduce the data to include only columns that are relevant for this analysis
+```{r}
+stormdata <- subset(stormdata, stormdata$year >= 1990)
+stormdata <- stormdata[,c("EVTYPE", "FATALITIES", "INJURIES", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP")]
+```
+
+## Results
+
+```{r}
+injury_results <- aggregate(stormdata[c("INJURIES")], list(evtype = stormdata$EVTYPE), sum)
+fatalities_results <- aggregate(stormdata[c("FATALITIES")], list(evtype = stormdata$EVTYPE), sum)
+combined_results <- merge(fatalities_results, injury_results, by.x = "evtype", by.y = "evtype")
+combined_results$sum <- combined_results$FATALITIES + combined_results$INJURIES
+injury_plot <- combined_results[order(-combined_results$INJURIES),]
+injury_plot <- head(injury_plot,10)
+injury_plot$evtype <- factor(injury_plot$evtype, levels = injury_plot$evtype)
+fatalities_plot <- combined_results[order(-combined_results$FATALITIES),]
+fatalities_plot <- head(fatalities_plot,10)
+fatalities_plot$evtype <- factor(fatalities_plot$evtype, levels = fatalities_plot$evtype)
+plot_1 <- ggplot(injury_plot, aes(x=evtype, y=INJURIES)) + 
+  geom_bar(stat = "identity", fill = "blue") + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) + 
+  ylab("Count") + ggtitle("Top 10 Injuries Causing Events") + 
+  xlab("Event Type")
+plot_2 <- ggplot(fatalities_plot, aes(x=evtype, y=FATALITIES)) + 
+  geom_bar(stat = "identity", fill = "green") + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) + 
+  ylab("Count") + ggtitle("Top 10 Fatalities Causing Events") + 
+  xlab("Event Type")
+grid.newpage()
+pushViewport(viewport(layout = grid.layout(1, 2)))
+vplayout <- function(x, y) viewport(layout.pos.row = x, layout.pos.col = y)
+print(plot_1, vp = vplayout(1, 1))
+print(plot_2, vp = vplayout(1, 2))
+```
