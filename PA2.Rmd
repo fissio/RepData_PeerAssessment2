@@ -25,38 +25,146 @@ year <- as.numeric(format(as.Date(stormdata$BGN_DATE, format = "%m/%d/%Y %H:%M:%
 stormdata <- cbind(stormdata, year)
 hist(stormdata$year, breaks = 60, xlab = "Year", main = "Distribution of Storm Data Over 1950 - 2010", col = "antiquewhite3")
 ```
-### In the earlier years of the database there are generally fewer events recorded,therefore we will only consider data collected from 1990 onwards. We will also reduce the data to include only columns that are relevant for this analysis
+#### In the earlier years of the database there are generally fewer events recorded,therefore we will only consider data collected from 1990 onwards. We will also reduce the data to include only columns that are relevant for this analysis
 ```{r}
 stormdata <- subset(stormdata, stormdata$year >= 1990)
 stormdata <- stormdata[,c("EVTYPE", "FATALITIES", "INJURIES", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP")]
-```
 
-## Results
-
-```{r}
+#Process data to determine what are the events that adversely affect population health
 injury_results <- aggregate(stormdata[c("INJURIES")], list(evtype = stormdata$EVTYPE), sum)
 fatalities_results <- aggregate(stormdata[c("FATALITIES")], list(evtype = stormdata$EVTYPE), sum)
 combined_results <- merge(fatalities_results, injury_results, by.x = "evtype", by.y = "evtype")
 combined_results$sum <- combined_results$FATALITIES + combined_results$INJURIES
-injury_plot <- combined_results[order(-combined_results$INJURIES),]
+injury_plot <- combined_results[order(-combined_results$INJURIES), ]
 injury_plot <- head(injury_plot,10)
 injury_plot$evtype <- factor(injury_plot$evtype, levels = injury_plot$evtype)
-fatalities_plot <- combined_results[order(-combined_results$FATALITIES),]
+fatalities_plot <- combined_results[order(-combined_results$FATALITIES), ]
 fatalities_plot <- head(fatalities_plot,10)
 fatalities_plot$evtype <- factor(fatalities_plot$evtype, levels = fatalities_plot$evtype)
+combined_plot <- combined_results[order(-combined_results$sum), ]
+combined_plot <- head(combined_plot,10)
+combined_plot$evtype <- factor(combined_plot$evtype, levels = combined_plot$evtype)
+```
+
+```{r}
+#Process data to determine
+unique(stormdata$PROPDMGEXP)
+unique(stormdata$CROPDMGEXP)
+```
+#### There are undefined characters contained within the exponent of property and crop damage data. We will arbitrarily set them to zeros. We will also change exponent represented in their character representation to their numeric values.
+
+```{r}
+stormdata$PROPDMGEXP <- as.character(stormdata$PROPDMGEXP)
+stormdata$PROPDMGEXP = gsub("\\-|\\+|\\?|h|H","0",stormdata$PROPDMGEXP)
+stormdata$PROPDMGEXP = gsub("k|K", "1000", stormdata$PROPDMGEXP)
+stormdata$PROPDMGEXP = gsub("m|M", "1000000", stormdata$PROPDMGEXP)
+stormdata$PROPDMGEXP = gsub("b|B", "1000000000", stormdata$PROPDMGEXP)
+stormdata$PROPDMGEXP <- as.numeric(stormdata$PROPDMGEXP)
+stormdata$PROPDMGEXP[is.na(stormdata$PROPDMGEXP)] = 0
+
+stormdata$CROPDMGEXP <- as.character(stormdata$CROPDMGEXP)
+stormdata$CROPDMGEXP = gsub("\\?","0",stormdata$CROPDMGEXP)
+stormdata$CROPDMGEXP = gsub("k|K", "1000", stormdata$CROPDMGEXP)
+stormdata$CROPDMGEXP = gsub("m|M", "1000000", stormdata$CROPDMGEXP)
+stormdata$CROPDMGEXP = gsub("b|B", "1000000000", stormdata$CROPDMGEXP)
+stormdata$CROPDMGEXP <- as.numeric(stormdata$CROPDMGEXP)
+stormdata$CROPDMGEXP[is.na(stormdata$CROPDMGEXP)] = 0
+
+stormdata$PROPDMG <- stormdata$PROPDMG * stormdata$PROPDMGEXP
+stormdata$CROPDMG <- stormdata$CROPDMG * stormdata$CROPDMGEXP
+
+propdmg_results <- aggregate(stormdata[c("PROPDMG")], list(evtype = stormdata$EVTYPE), sum)
+cropdmg_results <- aggregate(stormdata[c("CROPDMG")], list(evtype = stormdata$EVTYPE), sum)
+propcropdmg_results <- merge(propdmg_results, cropdmg_results, by.x = "evtype", by.y = "evtype")
+propcropdmg_results$sum <- propcropdmg_results$CROPDMG + propcropdmg_results$PROPDMG
+
+cropdmg_plot <- propcropdmg_results[order(-propcropdmg_results$CROPDMG), ]
+cropdmg_plot <- head(cropdmg_plot,10)
+cropdmg_plot$evtype <- factor(cropdmg_plot$evtype, levels = cropdmg_plot$evtype)
+propdmg_plot <- propcropdmg_results[order(-propcropdmg_results$PROPDMG), ]
+propdmg_plot <- head(propdmg_plot,10)
+propdmg_plot$evtype <- factor(propdmg_plot$evtype, levels = propdmg_plot$evtype)
+propcropdmg_plot <- propcropdmg_results[order(-propcropdmg_results$sum), ]
+propcropdmg_plot <- head(propcropdmg_plot,10)
+propcropdmg_plot$evtype <- factor(propcropdmg_plot$evtype, levels = propcropdmg_plot$evtype)
+```
+
+## Results  
+
+### Events Harmful to Population Health  
+```{r}
 plot_1 <- ggplot(injury_plot, aes(x=evtype, y=INJURIES)) + 
-  geom_bar(stat = "identity", fill = "blue") + 
-  theme(axis.text.x = element_text(angle = 90, hjust = 1)) + 
-  ylab("Count") + ggtitle("Top 10 Injuries Causing Events") + 
+  geom_bar(stat = "identity", fill = "blue") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8)) + 
+  ylab("Count") + ggtitle("Injuries") + 
   xlab("Event Type")
 plot_2 <- ggplot(fatalities_plot, aes(x=evtype, y=FATALITIES)) + 
-  geom_bar(stat = "identity", fill = "green") + 
-  theme(axis.text.x = element_text(angle = 90, hjust = 1)) + 
-  ylab("Count") + ggtitle("Top 10 Fatalities Causing Events") + 
+  geom_bar(stat = "identity", fill = "green") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8)) + 
+  ylab("Count") + ggtitle("Fatalities") + 
   xlab("Event Type")
-grid.newpage()
-pushViewport(viewport(layout = grid.layout(1, 2)))
-vplayout <- function(x, y) viewport(layout.pos.row = x, layout.pos.col = y)
-print(plot_1, vp = vplayout(1, 1))
-print(plot_2, vp = vplayout(1, 2))
+plot_3 <- ggplot(combined_plot, aes(x=evtype, y=sum)) + 
+  geom_bar(stat = "identity", fill = "red") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8)) + 
+  ylab("Count") + ggtitle("Fatalities+Injuries") + 
+  xlab("Event Type")
+grid.arrange(plot_1, plot_2, plot_3, ncol = 3, main = "Top 10 Events Affecting Population Health")
 ```
+
+
+
+
+#### The top 3 events that resulted in most injuries are  
+1. Tornado
+2. Flood
+3. Excessive Heat  
+
+#### The top 3 events that resulted in most fatalities are
+1. Excessive Heat
+2. Tornado
+3. Flash Flood
+
+#### The top 3 events taking into consideration both injuries and fatalities that are most harmful to population health are  
+1. Tornado
+2. Excessive Heat
+3. Flood  
+
+
+
+### Events that have the greatest economic consequences
+
+```{r}
+plot_1 <- ggplot(cropdmg_plot, aes(x=evtype, y=CROPDMG)) + 
+  geom_bar(stat = "identity", fill = "blue") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8)) + 
+  ylab("Cost") + ggtitle("Crop") + 
+  xlab("Event Type")
+plot_2 <- ggplot(propdmg_plot, aes(x=evtype, y=PROPDMG)) + 
+  geom_bar(stat = "identity", fill = "green") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8)) + 
+  ylab("Cost") + ggtitle("Property") + 
+  xlab("Event Type")
+plot_3 <- ggplot(propcropdmg_plot, aes(x=evtype, y=sum)) + 
+  geom_bar(stat = "identity", fill = "red") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8)) + 
+  ylab("Cost") + ggtitle("Property + Crop") + 
+  xlab("Event Type")
+grid.arrange(plot_1, plot_2, plot_3, ncol = 3, main = "Top 10 Events Having the Greatest Economic Consequences")
+```
+
+
+
+#### The top 3 events that resulted in most crop damages are  
+1. Drought
+2. Flood
+3. River Flood  
+
+#### The top 3 events that resulted in most property damages are
+1. Flood
+2. Hurricane/Typhoon
+3. Storm Surge
+
+#### The top 3 events taking into consideration both crop and property damages that have the greatest economic consequences are
+1. Flood
+2. Hurricane/Typhoon
+3. Storm Surge
